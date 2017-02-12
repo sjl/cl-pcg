@@ -2,3 +2,4 @@ syntax: glob
 
 scratch.lisp
 docs/build
+build/pcg

@@ -1,0 +1,61 @@
+#!/bin/sh
+#|-*- mode:lisp -*-|#
+#|
+exec ros -Q -- $0 "$@"
+|#
+
+
+(unless (find-package :pcg)
+  (ql:quickload '(:cl-pcg) :silent t))
+
+(require 'sb-rotate-byte)
+
+(declaim (optimize (debug 0) (safety 0) (speed 3)))
+
+(let ((*standard-output* (make-broadcast-stream)) ; shut
+      (*error-output* (make-broadcast-stream))) ; up
+  (asdf:load-system 'cl-pcg :force t))
+
+
+(deftype u32 () '(unsigned-byte 32))
+(defconstant +buffer-size+ (* 1 1024))
+
+(defun pcg-dump-data ()
+  (with-open-file (out "/dev/stdout"
+                       :direction :output
+                       :if-exists :append
+                       :element-type 'u32)
+    (loop
+      :with pcg = (pcg::make-pcg :seed (random (expt 2 32)) :stream-id 0)
+      :with buffer = (make-array +buffer-size+
+                       :element-type t
+                       :initial-element 0)
+      :do (loop :for i :from 0 :below +buffer-size+
+                :for n = (pcg::pcg-random% pcg)
+                :do (setf (aref buffer i) n))
+      (write-sequence buffer out))))
+
+(defun random-dump-data ()
+  (with-open-file (out "/dev/stdout"
+                       :direction :output
+                       :if-exists :append
+                       :element-type 'u32)
+    (loop
+      :with rs = (make-random-state t)
+      :with buffer = (make-array +buffer-size+
+                       :element-type 'u32
+                       :initial-element 0)
+      :do (loop :for i :from 0 :below +buffer-size+
+                :for n = (random (expt 2 32) rs)
+                :do (setf (aref buffer i) n))
+      (write-sequence buffer out))))
+
+(defun main (&optional generator &rest argv)
+  (declare (ignore argv))
+  (setf *random-state* (make-random-state t))
+  (handler-case
+      (if (string= generator "random")
+        (random-dump-data)
+        (pcg-dump-data))
+    (stream-error () t))
+  t)

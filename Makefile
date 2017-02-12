@@ -25,3 +25,9 @@ pubdocs: docs
 	rsync --delete -a ./docs/build/ ~/src/sjl.bitbucket.org/cl-pcg
 	hg -R ~/src/sjl.bitbucket.org commit -Am 'cl-pcg: Update site.'
 	hg -R ~/src/sjl.bitbucket.org push
+
+# Build -----------------------------------------------------------------------
+lisps := $(shell ffind '\.(asd|lisp|ros)$$')
+
+build/pcg: $(lisps)
+	ros build build/pcg.ros

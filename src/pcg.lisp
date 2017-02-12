@@ -20,10 +20,7 @@
                   :collect `(check-type ,place ,type))))
 
 
-;; Embedded from cl-utilities, with the bugfix of putting the inline declamation
-;; FIRST so it'll actually work.
-(declaim (inline rotate-byte))
-(defun rotate-byte% (count bytespec integer)
+(defun rotate-byte (count bytespec integer)
   "Rotates a field of bits within INTEGER; specifically, returns an
 integer that contains the bits of INTEGER rotated COUNT times
 leftwards within the byte specified by BYTESPEC, and elsewhere
@@ -31,7 +28,7 @@ contains the bits of INTEGER. See http://www.cliki.net/ROTATE-BYTE"
   (declare (optimize (speed 3) (safety 0) (space 0) (debug 1)))
   (let ((size (byte-size bytespec)))
     (when (= size 0)
-      (return-from rotate-byte% integer))
+      (return-from rotate-byte integer))
     (let ((count (mod count size)))
       (flet ((rotate-byte-from-0 (count size integer)
                  (let ((bytespec (byte size 0)))
@@ -43,12 +40,6 @@ contains the bits of INTEGER. See http://www.cliki.net/ROTATE-BYTE"
         (dpb (rotate-byte-from-0 count size (ldb bytespec integer))
              bytespec
              integer)))))
-
-(defun-inline rotate-byte (count bytespec integer)
-  #+sbcl
-  (sb-rotate-byte:rotate-byte count bytespec integer)
-  #-sbcl
-  (rotate-byte% count bytespec integer))
 
 
 (defun-inline % (n)
@@ -114,7 +105,8 @@ contains the bits of INTEGER. See http://www.cliki.net/ROTATE-BYTE"
   (declare (optimize speed)
            (type (unsigned-byte 32) data)
            (type (unsigned-byte 5) selector))
-  (rotate-byte selector (byte 32 0) data))
+  #+sbcl (sb-rotate-byte:rotate-byte selector (byte 32 0) data)
+  #-sbcl (rotate-byte selector (byte 32 0) data))
 
 
 ;;;; State Advancement --------------------------------------------------------
