@@ -7,7 +7,6 @@
 
 
 ;;;; Utils ---------------------------------------------------------------------
-
 (defmacro defun-inline (name &body body)
   "Like `defun`, but declaims `name` to be `inline`."
   `(progn
@@ -52,6 +51,9 @@ contains the bits of INTEGER. See http://www.cliki.net/ROTATE-BYTE"
 (deftype u64 ()
   '(unsigned-byte 64))
 
+(deftype u32 ()
+  '(unsigned-byte 32))
+
 
 ;;;; Data ---------------------------------------------------------------------
 (defstruct (pcg (:constructor actually-make-pcg))
@@ -66,7 +68,7 @@ contains the bits of INTEGER. See http://www.cliki.net/ROTATE-BYTE"
 (defun-inline permute-xor-shift (data)
   (declare (optimize speed)
            (type (unsigned-byte 37) data))
-  ;; The reference implemtation does this:
+  ;; The reference implementation does this:
   ;;
   ;;   uint32_t xorshifted = ((oldstate >> 18u) ^ oldstate) >> 27u;
   ;;
@@ -78,7 +80,7 @@ contains the bits of INTEGER. See http://www.cliki.net/ROTATE-BYTE"
   ;;   SSSSSbbb bbbbbbbb bbbbbbbb bbbbbbbb bbbbbxxx xxxxxxxx xxxxxxxx xxxxxxxx
   ;;
   ;; * S - 5 "selector" bits for the permutation.  Confusingly the xorshift
-  ;;       permutation doesn't use these to select anything, but instead mixes
+  ;;       permutation doesn't use these to SELECT anything, but instead mixes
   ;;       them into the other random bits.  The next permutation uses them to
   ;;       decide how far to rotate.
   ;; * b - 32 decently random bits, which are going to be permuted and used for
@@ -120,26 +122,27 @@ contains the bits of INTEGER. See http://www.cliki.net/ROTATE-BYTE"
 
 ;;;; Low-Level API ------------------------------------------------------------
 (declaim
-  (ftype (function (pcg) (unsigned-byte 32)) pcg-random%)
+  (ftype (function (pcg) u32) pcg-random%)
 
   ;; 2^32 streams ought to be enough for anybody
-  (ftype (function (u64 (unsigned-byte 32))
+  (ftype (function (u64 u32)
                    pcg)
          make-pcg%)
 
-  (ftype (function (pcg (integer 1 (#.(expt 2 32))))
-                   (unsigned-byte 32))
+  (ftype (function (pcg (integer 1 (#.(expt 2 32)))) u32)
          pcg-random-bounded%)
 
-  (ftype (function (pcg (integer 1 32))
-                   (unsigned-byte 32))
+  (ftype (function (pcg (signed-byte 32) (signed-byte 32))
+                   (signed-byte 32))
+         pcg-random-range%
+         pcg-random-range-inclusive%)
+
+  (ftype (function (pcg (integer 1 32)) u32)
          pcg-random-bits%)
 
   (ftype (function (pcg u64)) pcg-advance% pcg-rewind%)
 
-  (ftype (function (pcg) single-float) pcg-random-float%)
-
-  (ftype (function (pcg) double-float) pcg-random-double%))
+  (ftype (function (pcg) single-float) pcg-random-float%))
 
 
 (defun-inline pcg-random% (pcg)
@@ -189,6 +192,14 @@ contains the bits of INTEGER. See http://www.cliki.net/ROTATE-BYTE"
         :when (>= n threshold)
         :do (return (values (mod n bound)))))
 
+(defun-inline pcg-random-range% (pcg min max)
+  (declare (optimize speed))
+  (+ min (pcg-random-bounded% pcg (- max min))))
+
+(defun-inline pcg-random-range-inclusive% (pcg min max)
+  (declare (optimize speed))
+  (+ min (pcg-random-bounded% pcg (1+ (- max min)))))
+
 (defun-inline pcg-random-bits% (pcg count)
   "Return a random `(unsigned-byte COUNT)`.
 
@@ -217,6 +228,13 @@ contains the bits of INTEGER. See http://www.cliki.net/ROTATE-BYTE"
 
 
 (defun-inline pcg-advance% (pcg steps)
+  "Advance the state of `pcg` by `steps` steps.
+
+  This function returns `nil` and is only useful for its side effects.
+
+  This is a low-level function that assumes you are passing in the correct types.
+
+  "
   (declare (optimize speed))
   ;; See "Random Number Generation with Arbitrary Strides", Forrest B. Brown:
   ;; https://laws.lanl.gov/vhosts/mcnp.lanl.gov/pdf_files/anl-rn-arb-stride.pdf
@@ -239,16 +257,36 @@ contains the bits of INTEGER. See http://www.cliki.net/ROTATE-BYTE"
           (% (*+ (pcg-state pcg) multiplier-accumulator increment-accumulator)))))
 
 (defun-inline pcg-rewind% (pcg steps)
+  "Rewind the state of `pcg` by `steps` steps.
+
+  This function returns `nil` and is only useful for its side effects.
+
+  This is a low-level function that assumes you are passing in the correct types.
+
+  "
   (declare (optimize speed))
   (when (plusp steps)
     (pcg-advance% pcg (- +limit+ (1- steps)))))
 
 
 ;;;; High-Level API -----------------------------------------------------------
-(defun make-pcg (&key (seed 0) (stream-id 0))
-  (check-types stream-id (unsigned-byte 32)
-               seed u64)
-  (make-pcg% seed stream-id))
+(defun resolve-seed (seed)
+  (if (null seed)
+    (random (expt 2 64) (make-random-state t))
+    seed))
+
+(defun make-pcg (&key (seed nil) (stream-id 0))
+  "Create and return a new PCG.
+
+  If `seed` is `nil`, a fresh random seed will be generated with the
+  implementation's `cl:random` function, as if by:
+
+    (random ... (make-random-state t))
+
+  "
+  (check-types stream-id u32
+               seed (or null u64))
+  (make-pcg% (resolve-seed seed) stream-id))
 
 
 (defparameter *global-pcg* (make-pcg))
@@ -263,68 +301,117 @@ contains the bits of INTEGER. See http://www.cliki.net/ROTATE-BYTE"
 
 
 (defun pcg-random (pcg)
+  "Return a random `(unsigned-byte 32)`.
+
+  As a side effect, the state of `pcg` will be advanced.
+
+  "
   (check-types pcg pcg-designator)
   (pcg-random% (resolve-pcg pcg)))
 
 (defun pcg-random-float (pcg)
+  "Return a random `single-float` between `0.0` and `1.0`.
+
+  As a side effect, the state of `pcg` will be advanced.
+
+  "
   (check-types pcg pcg-designator)
   (pcg-random-float% (resolve-pcg pcg)))
 
-(defun pcg-random-double (pcg)
-  (check-types pcg pcg-designator)
-  (pcg-random-double% (resolve-pcg pcg)))
 
 (defun pcg-random-bounded (pcg bound)
+  "Return a random integer between `0` (inclusive) and `bound` (exclusive).
+
+  As a side effect, the state of `pcg` will be advanced.
+
+  "
   (check-types pcg pcg-designator
-               bound (and (unsigned-byte 32)
-                          (integer 1)))
+               bound (and u32 (integer 1)))
   (pcg-random-bounded% (resolve-pcg pcg) bound))
 
 (defun pcg-random-range (pcg min max)
+  "Return a random integer between `min` (inclusive) and `max` (exclusive).
+
+  As a side effect, the state of `pcg` will be advanced.
+
+  "
   (check-types pcg pcg-designator
-               min (unsigned-byte 32)
-               max (unsigned-byte 32))
+               min (signed-byte 32)
+               max (signed-byte 32))
   (assert (< min max) (min max))
-  (+ min (pcg-random-bounded% (resolve-pcg pcg) (- max min))))
+  (pcg-random-range% (resolve-pcg pcg) min max))
 
 (defun pcg-random-range-inclusive (pcg min max)
+  "Return a random integer between `min` (inclusive) and `max` (inclusive).
+
+  As a side effect, the state of `pcg` will be advanced.
+
+  "
   (check-types pcg pcg-designator
-               min (unsigned-byte 32)
-               max (unsigned-byte 32))
+               min (signed-byte 32)
+               max (signed-byte 32))
   (assert (<= min max) (min max))
-  (pcg-random-range (resolve-pcg pcg) min (1+ max)))
+  (pcg-random-range-inclusive% (resolve-pcg pcg) min max))
+
 
 (defun pcg-advance (pcg steps)
+  "Advance the state of `pcg` by `steps` steps.
+
+  This function returns `nil` and is only useful for its side effects.
+
+  "
   (check-types pcg pcg-designator
               steps u64)
   (pcg-advance% (resolve-pcg pcg) steps))
 
 (defun pcg-rewind (pcg steps)
+  "Rewind the state of `pcg` by `steps` steps.
+
+  This function returns `nil` and is only useful for its side effects.
+
+  "
   (check-types pcg pcg-designator
                steps u64)
   (pcg-rewind% (resolve-pcg pcg) steps))
 
 
 ;;;; Scratch ------------------------------------------------------------------
-; (defun data (n)
-;   (loop :repeat n :collect (pcg-random-single-float% *p*)))
+;; (defparameter *p* (make-pcg))
 
-; (losh:gnuplot
-;   (data 10000)
-;   :x #'identity
-;   :y (lambda (i) (/ 1.0 10000))
-;   :line-width 1
-;   :smooth :cumulative)
+;; (defun data (n)
+;;   (loop :repeat n :collect (pcg-random-float% *p*)))
 
-; (defun slow-advance (pcg n)
-;   (dotimes (_ n) (pcg-random pcg))
-;   nil)
+;; (losh:gnuplot
+;;   (data 10000)
+;;   :x #'identity
+;;   :y (lambda (i) (/ 1.0 10000))
+;;   :line-width 2
+;;   :smooth :cumulative)
 
-; (defun test (n)
-;   (let ((a (make-pcg))
-;         (b (make-pcg)))
-;     (pcg-advance% b n)
-;     (assert (= (pcg-random a) (pcg-random b)))))
+;; (defun slow-advance (pcg n)
+;;   (dotimes (_ n) (pcg-random pcg))
+;;   nil)
+
+;; (defun test (n)
+;;   (let ((a (make-pcg))
+;;         (b (make-pcg)))
+;;     (time (slow-advance a n))
+;;     (time (pcg-advance% b n))
+;;     (assert (= (pcg-random a) (pcg-random b)))))
+
+;; (losh:gnuplot
+;;   (sort (losh:hash-table-contents
+;;           (losh:proportions
+;;             (loop :repeat 1000000
+;;                   :collect (pcg-random-range-inclusive *p* -50 200))))
+;;         #'<
+;;         :key #'first)
+;;   :x #'first
+;;   :y #'second
+;;   :min-y 0.00
+;;   :max-y 0.01
+;;   :style :lines
+;;   :line-width 1)
 
 ;;;; TODO ----------------------------------------------------------------------
 ;;; https://experilous.com/1/blog/post/perfect-fast-random-floating-point-numbers
