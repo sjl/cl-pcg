@@ -30,12 +30,12 @@ contains the bits of INTEGER. See http://www.cliki.net/ROTATE-BYTE"
       (return-from rotate-byte integer))
     (let ((count (mod count size)))
       (flet ((rotate-byte-from-0 (count size integer)
-                 (let ((bytespec (byte size 0)))
-                   (if (> count 0)
-                       (logior (ldb bytespec (ash integer count))
-                               (ldb bytespec (ash integer (- count size))))
-                       (logior (ldb bytespec (ash integer count))
-                               (ldb bytespec (ash integer (+ count size))))))))
+               (let ((bytespec (byte size 0)))
+                 (if (> count 0)
+                   (logior (ldb bytespec (ash integer count))
+                           (ldb bytespec (ash integer (- count size))))
+                   (logior (ldb bytespec (ash integer count))
+                           (ldb bytespec (ash integer (+ count size))))))))
         (dpb (rotate-byte-from-0 count size (ldb bytespec integer))
              bytespec
              integer)))))
@@ -129,16 +129,12 @@ contains the bits of INTEGER. See http://www.cliki.net/ROTATE-BYTE"
                    pcg)
          make-pcg%)
 
-  (ftype (function (pcg (integer 1 (#.(expt 2 32)))) u32)
+  (ftype (function (pcg (and u32 (integer 1))) u32)
          pcg-random-bounded%)
 
   (ftype (function (pcg (signed-byte 32) (signed-byte 32))
                    (signed-byte 32))
-         pcg-random-range%
-         pcg-random-range-inclusive%)
-
-  (ftype (function (pcg (integer 1 32)) u32)
-         pcg-random-bits%)
+         pcg-random-range%)
 
   (ftype (function (pcg u64)) pcg-advance% pcg-rewind%)
 
@@ -196,23 +192,6 @@ contains the bits of INTEGER. See http://www.cliki.net/ROTATE-BYTE"
   (declare (optimize speed))
   (+ min (pcg-random-bounded% pcg (- max min))))
 
-(defun-inline pcg-random-range-inclusive% (pcg min max)
-  (declare (optimize speed))
-  (+ min (pcg-random-bounded% pcg (1+ (- max min)))))
-
-(defun-inline pcg-random-bits% (pcg count)
-  "Return a random `(unsigned-byte COUNT)`.
-
-  As a side effect, the state of `pcg` will be advanced.
-
-  `count` must be between `1` and `32` (though `32` would be identical to just
-  calling `pcg-random%`).
-
-  This is a low-level function that assumes you are passing in the correct types.
-
-  "
-  (declare (optimize speed))
-  (ldb (byte count 0) (pcg-random% pcg)))
 
 (defun-inline pcg-random-float% (pcg)
   "Return a random `single-float` between `0.0` and `1.0`.
@@ -300,58 +279,52 @@ contains the bits of INTEGER. See http://www.cliki.net/ROTATE-BYTE"
     pcg-designator))
 
 
-(defun pcg-random (pcg)
-  "Return a random `(unsigned-byte 32)`.
+(defun pcg-random-integer (pcg bound &optional max inclusive?)
+  "Return a random integer.
 
-  As a side effect, the state of `pcg` will be advanced.
+  If `max` is omitted the result will be in the interval `[0, bound)`.
 
-  "
-  (check-types pcg pcg-designator)
-  (pcg-random% (resolve-pcg pcg)))
+  If `max` is given the result will be in the interval `[bound, max)`.
 
-(defun pcg-random-float (pcg)
-  "Return a random `single-float` between `0.0` and `1.0`.
-
-  As a side effect, the state of `pcg` will be advanced.
-
-  "
-  (check-types pcg pcg-designator)
-  (pcg-random-float% (resolve-pcg pcg)))
-
-
-(defun pcg-random-bounded (pcg bound)
-  "Return a random integer between `0` (inclusive) and `bound` (exclusive).
+  If `inclusive?` is true the result will be in the interval `[bound, max]`.
 
   As a side effect, the state of `pcg` will be advanced.
 
   "
   (check-types pcg pcg-designator
-               bound (and u32 (integer 1)))
-  (pcg-random-bounded% (resolve-pcg pcg) bound))
+               bound u32
+               max (or null u32))
+  (let ((pcg (resolve-pcg pcg)))
+    (if (null max)
+      (pcg-random-bounded% pcg bound)
+      (+ bound (pcg-random-bounded% pcg (+ (- max bound)
+                                           (if inclusive? 1 0)))))))
 
-(defun pcg-random-range (pcg min max)
-  "Return a random integer between `min` (inclusive) and `max` (exclusive).
+(defun pcg-random-float (pcg &optional bound max)
+  "Return a random `single-float`.
+
+  If `bound` is omitted the result will be in the interval `[0, 1)`.
+
+  If `max` is omitted the result will be in the interval `[0, bound)`.
+
+  If `max` is given the result will be in the interval `[bound, max)`.
 
   As a side effect, the state of `pcg` will be advanced.
 
   "
   (check-types pcg pcg-designator
-               min (signed-byte 32)
-               max (signed-byte 32))
-  (assert (< min max) (min max))
-  (pcg-random-range% (resolve-pcg pcg) min max))
+               bound (or null single-float)
+               max (or null single-float))
+  (let ((f (pcg-random-float% (resolve-pcg pcg))))
+    (cond
+      ((null bound) f)
+      ((null max) (* bound f))
+      (t (+ bound (* (- max bound) f))))))
 
-(defun pcg-random-range-inclusive (pcg min max)
-  "Return a random integer between `min` (inclusive) and `max` (inclusive).
-
-  As a side effect, the state of `pcg` will be advanced.
-
-  "
-  (check-types pcg pcg-designator
-               min (signed-byte 32)
-               max (signed-byte 32))
-  (assert (<= min max) (min max))
-  (pcg-random-range-inclusive% (resolve-pcg pcg) min max))
+(defun pcg-random (pcg bound &optional max inclusive?)
+  (etypecase bound
+    (integer (pcg-random-integer pcg bound max inclusive?))
+    (single-float (pcg-random-float pcg bound max))))
 
 
 (defun pcg-advance (pcg steps)
@@ -361,7 +334,7 @@ contains the bits of INTEGER. See http://www.cliki.net/ROTATE-BYTE"
 
   "
   (check-types pcg pcg-designator
-              steps u64)
+               steps u64)
   (pcg-advance% (resolve-pcg pcg) steps))
 
 (defun pcg-rewind (pcg steps)
@@ -379,7 +352,7 @@ contains the bits of INTEGER. See http://www.cliki.net/ROTATE-BYTE"
 ;; (defparameter *p* (make-pcg))
 
 ;; (defun data (n)
-;;   (loop :repeat n :collect (pcg-random-float% *p*)))
+;;   (loop :repeat n :collect (pcg-random *p* 9.0)))
 
 ;; (losh:gnuplot
 ;;   (data 10000)
