@@ -8,6 +8,8 @@
 
   :depends-on (#+sbcl :sb-rotate-byte)
 
+  :in-order-to ((asdf:test-op (asdf:test-op :cl-pcg.test)))
+
   :serial t
   :components ((:module "vendor" :serial t
                 :components ((:file "quickutils-package")

@@ -2,7 +2,7 @@
 ;;;; See http://quickutil.org for details.
 
 ;;;; To regenerate:
-;;;; (qtlc:save-utils-as "quickutils.lisp" :ensure-package T :package "PCG.QUICKUTILS")
+;;;; (qtlc:save-utils-as "quickutils.lisp" :utilities '(:SYMB) :ensure-package T :package "PCG.QUICKUTILS")
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (unless (find-package "PCG.QUICKUTILS")
@@ -12,6 +12,26 @@
 
 (in-package "PCG.QUICKUTILS")
 
-NIL
+(when (boundp '*utilities*)
+  (setf *utilities* (union *utilities* '(:MKSTR :SYMB))))
+
+  (defun mkstr (&rest args)
+    "Receives any number of objects (string, symbol, keyword, char, number), extracts all printed representations, and concatenates them all into one string.
+
+Extracted from _On Lisp_, chapter 4."
+    (with-output-to-string (s)
+      (dolist (a args) (princ a s))))
+  
+
+  (defun symb (&rest args)
+    "Receives any number of objects, concatenates all into one string with `#'mkstr` and converts them to symbol.
+
+Extracted from _On Lisp_, chapter 4.
+
+See also: `symbolicate`"
+    (values (intern (apply #'mkstr args))))
+  
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (export '(symb)))
 
 ;;;; END OF quickutils.lisp ;;;;

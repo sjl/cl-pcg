@@ -4,6 +4,7 @@
   "quickutils.lisp"
   :utilities '(
 
+               :symb
 
                )
   :package "PCG.QUICKUTILS")
