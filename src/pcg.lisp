@@ -279,52 +279,57 @@ contains the bits of INTEGER. See http://www.cliki.net/ROTATE-BYTE"
     pcg-designator))
 
 
-(defun pcg-random-integer (pcg bound &optional max inclusive?)
+(defun pcg-random-integer (pcg min max)
   "Return a random integer.
 
-  If `max` is omitted the result will be in the interval `[0, bound)`.
-
-  If `max` is given the result will be in the interval `[bound, max)`.
-
-  If `inclusive?` is true the result will be in the interval `[bound, max]`.
-
   As a side effect, the state of `pcg` will be advanced.
 
   "
   (check-types pcg pcg-designator
-               bound u32
-               max (or null u32))
-  (let ((pcg (resolve-pcg pcg)))
-    (if (null max)
-      (pcg-random-bounded% pcg bound)
-      (+ bound (pcg-random-bounded% pcg (+ (- max bound)
-                                           (if inclusive? 1 0)))))))
+               min integer
+               max integer)
+  (+ min (pcg-random-bounded% (resolve-pcg pcg)
+                              (+ (- max min)))))
 
-(defun pcg-random-float (pcg &optional bound max)
+(defun pcg-random-float (pcg min max)
   "Return a random `single-float`.
 
-  If `bound` is omitted the result will be in the interval `[0, 1)`.
-
-  If `max` is omitted the result will be in the interval `[0, bound)`.
-
-  If `max` is given the result will be in the interval `[bound, max)`.
-
   As a side effect, the state of `pcg` will be advanced.
 
   "
   (check-types pcg pcg-designator
-               bound (or null single-float)
-               max (or null single-float))
-  (let ((f (pcg-random-float% (resolve-pcg pcg))))
-    (cond
-      ((null bound) f)
-      ((null max) (* bound f))
-      (t (+ bound (* (- max bound) f))))))
+               min single-float
+               max single-float)
+  (+ min (* (- max min)
+            (pcg-random-float% (resolve-pcg pcg)))))
 
 (defun pcg-random (pcg bound &optional max inclusive?)
-  (etypecase bound
-    (integer (pcg-random-integer pcg bound max inclusive?))
-    (single-float (pcg-random-float pcg bound max))))
+  "Generate and return a random number in the specified interval.
+
+  If `max` is omitted the interval will be `[0, bound)`.
+
+  If `max` is given the interval will be `[bound, max)`.
+
+  If `inclusive?` is given the interval will be `[bound, max]`.
+
+  If either of `bound` or `max` are floats, the result will be a float.
+  Otherwise the result will be an integer.
+
+  As a side effect, the state of `pcg` will be advanced.
+
+  "
+  (let* ((float? (or (floatp bound)
+                     (floatp max)))
+         (result-type (if float? 'single-float 'integer))
+         (delta (if (and inclusive? (not float?)) 1 0))
+         (min (coerce (if (null max) 0 bound) result-type))
+         (max (coerce (+ (if (null max) bound max) delta) result-type)))
+    (assert (< min max) ()
+      "Invalid interval for generating a random number: [~S, ~S~A"
+      min max (if inclusive? "]" ")"))
+    (case result-type
+      (integer (pcg-random-integer pcg min max))
+      (single-float (pcg-random-float pcg min max)))))
 
 
 (defun pcg-advance (pcg steps)

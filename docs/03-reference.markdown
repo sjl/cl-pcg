@@ -65,6 +65,21 @@ Advance the state of `pcg` by `steps` steps.
 
     (PCG-RANDOM PCG BOUND &OPTIONAL MAX INCLUSIVE?)
 
+Generate and return a random number in the specified interval.
+
+  If `max` is omitted the interval will be `[0, bound)`.
+
+  If `max` is given the interval will be `[bound, max)`.
+
+  If `inclusive?` is given the interval will be `[bound, max]`.
+
+  If either of `bound` or `max` are floats, the result will be a float.
+  Otherwise the result will be an integer.
+
+  As a side effect, the state of `pcg` will be advanced.
+
+  
+
 ### `PCG-RANDOM%` (function)
 
     (PCG-RANDOM% PCG)

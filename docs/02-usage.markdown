@@ -4,6 +4,8 @@ Usage
 `cl-pcg` is a [permuted congruential generator][pcg] implementation in pure
 Common Lisp.  It provides a high-level API and a low-level API.
 
+PCGs are **not** cryptographically secure.  If you need that, look elsewhere.
+
 [pcg]: http://www.pcg-random.org/
 
 [TOC]
@@ -63,8 +65,18 @@ For example:
     (pcg-random *gen* 15 28)   ; => [15, 28)
     (pcg-random *gen* 15 28 t) ; => [15, 28] <- inclusive endpoint!
 
-`pcg-random` can also generate `single-float`s if `bound` and `max` are given as
-`single-float`s.
+`inclusive?` is treated as a generalized boolean, so you can write `(pcg-random
+gen -10 10 :inclusive)` if you feel it reads better.
+
+`pcg-random` can also generate `single-float`s if `bound` and/or `max` are given
+as `single-float`s:
+
+    :::lisp
+    (defparameter *gen* (make-pcg))
+
+    (pcg-random *gen* 10.0)     ; => [0.0, 10.0]
+    (pcg-random *gen* 0 10.0)   ; => [0.0, 10.0]
+    (pcg-random *gen* -1.0 1.0) ; => [-1.0, 1.0]
 
 ### The Global Generator
 
@@ -114,3 +126,9 @@ performance.
 The low-level API assumes you will pass in arguments of the correct type.  If
 you fuck this up, all bets are off.  Read the code to figure out exactly what
 you need to pass in (or just use the high-level API like a sane person).
+
+Limitations
+-----------
+
+You can only generate 32-bit integers, and only single floats.  This will change
+whenever I get around to fixing things up.
