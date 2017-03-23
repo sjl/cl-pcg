@@ -89,8 +89,8 @@ high-level API to use a globally-defined one:
 ### Advancing & Rewinding
 
 Sometimes it can be useful to advance or rewind a generator by a certain number
-of steps.  The `(pcg-advance pcg steps)` and `(pcg-rewind pcg steps)` can be
-used to do this:
+of steps.  The `(pcg-advance pcg steps)` and `(pcg-rewind pcg steps)` functions
+can be used to do this:
 
     :::lisp
     (defparameter *gen* (make-pcg))
