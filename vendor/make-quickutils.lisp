@@ -5,6 +5,7 @@
   :utilities '(
 
                :symb
+               :with-gensyms
 
                )
   :package "PCG.QUICKUTILS")
