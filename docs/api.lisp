@@ -13,7 +13,7 @@ don't touch it.
 
 (d-api:generate-documentation
   :cl-pcg
-  #p"docs/03-reference.markdown"
+  #p"docs/02-reference.markdown"
   (list "PCG")
   *header*
   :title "API Reference")
