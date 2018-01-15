@@ -1,7 +1,7 @@
 (asdf:defsystem :cl-pcg
   :description "A bare-bones Permuted Congruential Generator implementation in pure Common Lisp."
-
   :author "Steve Losh <steve@stevelosh.com>"
+  :homepage "https://sjl.bitbucket.io/cl-pcg/"
 
   :license "MIT"
   :version "1.0.0"
