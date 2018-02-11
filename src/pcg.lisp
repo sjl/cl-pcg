@@ -268,14 +268,14 @@ contains the bits of INTEGER. See http://www.cliki.net/ROTATE-BYTE"
   (make-pcg% (resolve-seed seed) stream-id))
 
 
-(defparameter *global-pcg* (make-pcg))
+(defparameter *global-generator* (make-pcg))
 
 (deftype pcg-designator ()
   '(or (eql t) pcg))
 
 (defun-inline resolve-pcg (pcg-designator)
   (if (eq t pcg-designator)
-    *global-pcg*
+    *global-generator*
     pcg-designator))
 
 
