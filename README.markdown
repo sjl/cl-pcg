@@ -10,10 +10,9 @@ PCGs are **not** cryptographically secure.  If you need that, look elsewhere.
 [pcg]: http://www.pcg-random.org/
 
 * **License:** MIT
-* **Documentation:** <https://sjl.bitbucket.io/cl-pcg/>
-* **Mercurial:** <https://bitbucket.org/sjl/cl-pcg/>
+* **Documentation:** <https://docs.stevelosh.com/cl-pcg/>
+* **Mercurial:** <https://hg.sr.ht/~sjl/cl-pcg/>
 * **Git:** <https://github.com/sjl/cl-pcg/>
-
 
 Testing with Dieharder
 ----------------------
@@ -27,4 +26,4 @@ make build/pcg
 ```
 
 `build/pcg` will dump out infinite random bytes until stdout breaks, so maybe
-don't run it in a bare terminal unless you want to just totally hose it. 
+don't run it in a bare terminal unless you want to just totally hose it.
