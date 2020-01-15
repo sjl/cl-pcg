@@ -11,7 +11,7 @@ PCGs are **not** cryptographically secure.  If you need that, look elsewhere.
 
 * **License:** MIT
 * **Documentation:** <https://docs.stevelosh.com/cl-pcg/>
-* **Mercurial:** <https://hg.sr.ht/~sjl/cl-pcg/>
+* **Mercurial:** <https://hg.stevelosh.com/cl-pcg/>
 * **Git:** <https://github.com/sjl/cl-pcg/>
 
 Testing with Dieharder
